@@ -5,6 +5,7 @@
  */
 
 #include <stdint.h>
+#include <stddef.h>
 
 /**
  * A normal WAVL tree result
@@ -39,7 +40,19 @@ typedef uint32_t wavl_result_t;
 /**
  * Mark branch unlikely to be taken
  */
-#define WAVL_UNLIKELY(_b)               _b
+#define WAVL_UNLIKELY(_b)               __builtin_expect(!!(_b), 0)
+
+/**
+ * Container-of macro
+ * \param pointer Node pointer
+ * \param type The target type of the containing structure
+ * \param member The name of the member of the containing structure
+ *
+ * \return Pointer to the structure that contains the node
+ */
+#define WAVL_CONTAINER_OF(pointer, type, member) \
+    ({ __typeof__( ((type *)0)->member ) *__memb = (pointer); \
+       (type *)( (char *)__memb - offsetof(type, member) ); })
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -109,6 +122,11 @@ struct wavl_tree_node {
                           *right;   /**< Right-hand child; NULL if not present */
     int rank;                       /**< The rank of this node */
 };
+
+/**
+ * Clear a newly allocated WAVL tree node.
+ */
+#define WAVL_TREE_NODE_CLEAR(_n) do { (_n)->left = (_n)->right = NULL; (_n)->rank = -1; } while (0)
 
 /**
  * A WAVL tree

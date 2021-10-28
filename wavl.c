@@ -21,12 +21,15 @@ wavl_result_t wavl_tree_init(struct wavl_tree *tree,
 
 /**
  * Given a node, promote the neighbourhood.
+ *
+ * This is the first step of rebalancing after insertion.
  */
 void _wavl_tree_promote_at(struct wavl_tree_node *parent,
                            struct wavl_tree_node *node)
 {
     struct wavl_tree_node *sibling = NULL;
 
+    WAVL_ASSERT(NULL != parent);
     WAVL_ASSERT(NULL != node);
 
     /* Since the new node is already spliced into the tree, we can simply
@@ -59,6 +62,7 @@ void _wavl_tree_rotate_right_at(struct wavl_tree *tree,
 
     y = x->right;
 
+
 }
 
 void _wavl_tree_rotate_left_at(struct wavl_tree *tree,
@@ -76,7 +80,8 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
 {
     wavl_result_t ret = WAVL_ERR_OK;
 
-    struct wavl_tree_node *parent = NULL;
+    struct wavl_tree_node *parent = NULL,
+                          *safe_node = NULL;
 
     WAVL_ASSERT_ARG(NULL != tree);
     WAVL_ASSERT_ARG(NULL != key);
@@ -95,7 +100,7 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
     }
 
     /* Hunt for a candidate leaf to insert this node in */
-    parent = tree->root;
+    parent = safe_node = tree->root;
 
     while (NULL != parent) {
         int dir = -1;
@@ -293,6 +298,117 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
 
 #ifdef __WAVL_TEST__
 #include <stdio.h>
+#include <stdbool.h>
+
+#define WAVL_TEST_ASSERT(_x) \
+    do {                                \
+        if (!(_x)) {                    \
+            fprintf(stderr, "WAVL Test Assertion Failure: " #_x " == FALSE. At " __FILE__ ":%d\n", __LINE__); \
+            return false;               \
+        }                               \
+    } while (0)
+
+#define TEST_NODE(_x) WAVL_CONTAINER_OF((_x), struct test_node, node)
+
+/**
+ * Node for testing the WAVL tree out
+ */
+struct test_node {
+    int id; /**< For testing purposes, the ID of the node is our key */
+    struct wavl_tree_node node;
+};
+
+/**
+ * Array of test nodes, used in test cases
+ */
+struct test_node nodes[256];
+
+static
+wavl_result_t _test_node_compare_func(int lhs,
+                                      int rhs,
+                                      int *pdir)
+{
+    *pdir = lhs - rhs;
+    return WAVL_ERROR_OK;
+}
+
+/**
+ * Comparison function (for testing), to compare node-to-node
+ */
+static
+wavl_result_t _test_node_to_node_compare_func(struct wavl_tree_node *lhs,
+                                              struct wavl_tree_node *rhs,
+                                              int *pdir)
+{
+    return _test_node_compare_func(TEST_NODE(lhs)->id, TEST_NODE(rhs)->id, pdir);
+}
+
+/**
+ * Comparison function (for testing), to compare key-to-node
+ */
+static
+wavl_result_t _test_node_to_value_compare_func(void *key_lhs,
+                                               struct wavl_tree_node *rhs,
+                                               int *pdir)
+{
+    return _test_node_compare_func((int)key_lhs, TEST_NODE(rhs)->id, pdir);
+}
+
+
+/**
+ * Clear the array of test nodes
+ */
+void wavl_test_clear(void)
+{
+    for (size_t i = 0; i < sizeof(nodes)/sizeof(struct test_node); i++) {
+        struct test_node *node = &nodes[i];
+
+        node->id = 0;
+        WAVL_TREE_NODE_CLEAR(&node->node);
+    }
+}
+
+static
+bool wavl_test_init(void)
+{
+    struct wavl_tree tree;
+
+    printf("WAVL: Testing initialization.\n");
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
+
+    return true;
+}
+
+static
+bool wavl_test_promote(void)
+{
+    struct test_node x,
+                     x_p,
+                     y;
+
+
+    struct wavl_tree_node *nd_x = &x.node,
+                          *nd_x_p = &x_p.node,
+                          *nd_y = &y.node;
+
+    printf("WAVL: Testing promotion.\n");
+
+    WAVL_TREE_NODE_CLEAR(nd_x);
+    WAVL_TREE_NODE_CLEAR(nd_x_p);
+    WAVL_TREE_NODE_CLEAR(nd_y);
+
+    nd_x->rank = 0;
+    nd_x_p->left = nd_x;
+    nd_x_p->rank = 2;
+    nd_x_p->right = nd_y;
+    nd_y->rank = 1;
+
+    _wavl_tree_promote_at(nd_x_p, nd_x);
+
+    return true;
+}
+
 
 int main(int argc __attribute__((unused)), const char *argv[])
 {
@@ -300,6 +416,10 @@ int main(int argc __attribute__((unused)), const char *argv[])
 
     fprintf(stderr, "%s: tester\n", argv[0]);
 
+    wavl_test_init();
+    wavl_test_promote();
+
+    ret = EXIT_SUCCESS;
     return ret;
 }
 #endif /* defined(__WAVL_TEST__) */

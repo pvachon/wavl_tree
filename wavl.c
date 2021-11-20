@@ -1,6 +1,7 @@
 #include "wavl.h"
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 wavl_result_t wavl_tree_init(struct wavl_tree *tree,
                              wavl_node_to_node_compare_func_t node_cmp,
@@ -20,58 +21,337 @@ wavl_result_t wavl_tree_init(struct wavl_tree *tree,
 }
 
 /**
- * Given a node, promote the neighbourhood.
- *
- * This is the first step of rebalancing after insertion.
+ * Perform a double-right rotation of the node x. We could do this using the other
+ * rotate primitives, but for the sake of efficiency we will directly implement
+ * the rotation.
  */
-void _wavl_tree_promote_at(struct wavl_tree_node *parent,
-                           struct wavl_tree_node *node)
+static
+void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
+                                       struct wavl_tree_node *x)
 {
-    struct wavl_tree_node *sibling = NULL;
-
-    WAVL_ASSERT(NULL != parent);
-    WAVL_ASSERT(NULL != node);
-
-    /* Since the new node is already spliced into the tree, we can simply
-     * assume that the node that isn't this node is the sibling node.
-     */
-    sibling = parent->left == node ? parent->right : parent->left;
-
-    /* Adjust the ranks */
-    parent->rank -= 1;
-    sibling->rank += 1;
-    node->rank = 1;
-}
-
-/**
- * Perform a right rotation of the node x.
- *
- * This requires parent(z), z and x. z also is parent(x). y is right(x)
- */
-void _wavl_tree_rotate_right_at(struct wavl_tree *tree,
-                                struct wavl_tree_node *parent,
-                                struct wavl_tree_node *z,
-                                struct wavl_tree_node *x)
-{
-    struct wavl_tree_node *y = NULL;
+    struct wavl_tree_node *y = NULL,
+                          *z = NULL,
+                          *p_z = NULL;
 
     WAVL_ASSERT(NULL != tree);
-    WAVL_ASSERT(NULL != parent);
-    WAVL_ASSERT(NULL != z);
     WAVL_ASSERT(NULL != x);
 
     y = x->right;
+    z = x->parent;
+    p_z = z->parent;
 
+    /* Rotate Y into place */
+    y->parent = p_z;
+    if (NULL != p_z) {
+        if (z == p_z->left) {
+            p_z->left = y;
+        } else {
+            p_z->right = y;
+        }
+    } else {
+        tree->root = y;
+    }
 
+    /* Copy Z's rank distance */
+    y->rd = z->rd;
+
+    /* Move y's left subtree (since x < left(y)) to x's right subtree */
+    x->right = y->left;
+
+    if (NULL != y->left) {
+        struct wavl_tree_node *left_y = y->left;
+        left_y->parent = x;
+    }
+
+    y->left = x;
+    x->parent = y;
+    x->rd = WAVL_NODE_RANK_DIFF_1;
+
+    /* Set x's right subtree rank difference to 1 */
+    if (NULL != x->left) {
+        struct wavl_tree_node *left_x = x->left;
+        left_x->rd = WAVL_NODE_RANK_DIFF_1;
+    }
+
+    /* Move y's right subtree (since z > right(y)) to z's left subtree */
+    z->left = y->right;
+
+    if (NULL != y->right) {
+        struct wavl_tree_node *right_y = y->right;
+        right_y->parent = z;
+    }
+
+    y->right = z;
+    z->parent = y;
+    z->rd = WAVL_NODE_RANK_DIFF_1;
+
+    /* Set z's right subtree rank difference to 1 */
+    if (NULL != z->right) {
+        struct wavl_tree_node *right_z = z->right;
+        right_z->rd = WAVL_NODE_RANK_DIFF_1;
+    }
 }
 
-void _wavl_tree_rotate_left_at(struct wavl_tree *tree,
-                               struct wavl_tree_node *node)
+/**
+ * Perform a single right rotation of the node x.
+ *
+ * Rotate x into the position of its parent (z), and demote its parent.
+ *
+ * \param tree The tree. This is updated if z is the root of the tree.
+ * \param x The node to rotate into place.
+ *
+ * This function is invoked as part of rebalancing.
+ */
+static
+void _wavl_tree_rotate_right_at(struct wavl_tree *tree,
+                                struct wavl_tree_node *x)
 {
+    struct wavl_tree_node *y = NULL,
+                          *z = NULL,
+                          *p_z = NULL,
+                          *left_z = NULL;
+
     WAVL_ASSERT(NULL != tree);
-    WAVL_ASSERT(NULL != node);
+    WAVL_ASSERT(NULL != x);
+
+    z = x->parent;
+    y = x->right;
+    p_z = z->parent;
+
+    WAVL_ASSERT(NULL == y || WAVL_NODE_RANK_DIFF_2 == y->rd);
+
+    /* Rotate X into place */
+    x->parent = p_z;
+    if (NULL != p_z) {
+        if (p_z->left == z) {
+            p_z->left = x;
+        } else {
+            p_z->right = x;
+        }
+    } else {
+        tree->root = x;
+    }
+
+    /* Make z the right-child of x */
+    x->right = z;
+    z->parent = x;
+
+    x->rd = z->rd;
+    z->rd = WAVL_NODE_RANK_DIFF_1;
+
+    /* Make y the left-child of z */
+    z->left = y;
+    if (NULL != y) {
+        y->parent = z;
+
+        /* Fix up the rank differences */
+        y->rd = WAVL_NODE_RANK_DIFF_1;
+    }
+
+    /* left(z) must have a rank of 1 now */
+    left_z = z->left;
+    left_z->rd = WAVL_NODE_RANK_DIFF_1;
 }
 
+/**
+ * Perform a dobule-left rotation of the node x.
+ */
+static
+void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
+                                      struct wavl_tree_node *x)
+{
+    struct wavl_tree_node *y = NULL,
+                          *z = NULL,
+                          *p_z = NULL;
+
+    WAVL_ASSERT(NULL != tree);
+    WAVL_ASSERT(NULL != x);
+
+    y = x->left;
+    z = x->parent;
+    p_z = z->parent;
+
+    /* Splice Y into its new position */
+    y->parent = p_z;
+    if (NULL != p_z) {
+        if (z == p_z->left) {
+            p_z->left = y;
+        } else {
+            p_z->right = y;
+        }
+    } else {
+        tree->root = y;
+    }
+
+    /* Copy Z's rank distance, since this does not change */
+    y->rd = z->rd;
+
+    /* Move y's left subtree to z's right subtree (z < right(y)) */
+    z->right = y->left;
+    if (NULL != y->left) {
+        struct wavl_tree_node *left_y = y->left;
+        left_y->parent = z;
+    }
+
+    y->left = z;
+    z->parent = y;
+    z->rd = WAVL_NODE_RANK_DIFF_1;
+
+    /* Set z's right subtree rank difference to 1 */
+    if (NULL != z->left) {
+        struct wavl_tree_node *left_z = z->left;
+        left_z->rd = WAVL_NODE_RANK_DIFF_1;
+    }
+
+    /* Move y's right subtree to x's left */
+    x->right = y->right;
+    if (NULL != y->right) {
+        struct wavl_tree_node *right_y = y->right;
+        right_y->parent = x;
+    }
+
+    y->right = x;
+    x->parent = y;
+    x->rd = WAVL_NODE_RANK_DIFF_1;
+
+    /* Set x's right subtree rank difference to 1 */
+    if (NULL != x->right) {
+        struct wavl_tree_node *right_x = x->right;
+        right_x->rd = WAVL_NODE_RANK_DIFF_1;
+    }
+}
+
+/**
+ * Perform a single left rotation about the node x.
+ *
+ */
+static
+void _wavl_tree_rotate_left_at(struct wavl_tree *tree,
+                               struct wavl_tree_node *x)
+{
+    struct wavl_tree_node *y = NULL,
+                          *z = NULL,
+                          *p_z = NULL,
+                          *right_z = NULL;
+
+    WAVL_ASSERT(NULL != tree);
+    WAVL_ASSERT(NULL != x);
+
+    z = x->parent;
+    y = x->left;
+    p_z = z->parent;
+
+    WAVL_ASSERT(NULL == y || WAVL_NODE_RANK_DIFF_2 == y->rd);
+
+    /* Rotate X into its new place */
+    x->parent = p_z;
+    if (NULL != p_z) {
+        if (p_z->left == z) {
+            p_z->left = x;
+        } else {
+            p_z->right = x;
+        }
+    } else {
+        tree->root = x;
+    }
+
+    /* make z the left-child of x */
+    x->left = z;
+    z->parent = x;
+
+    x->rd = z->rd;
+    z->rd = WAVL_NODE_RANK_DIFF_1;
+
+    /* Maye y the right-child of z */
+    z->right = y;
+    if (NULL != y) {
+        y->parent = z;
+        y->rd = WAVL_NODE_RANK_DIFF_1;
+    }
+
+    /* right(z) must also have a rank difference of 1 now */
+    right_z = z->right;
+    right_z->rd = WAVL_NODE_RANK_DIFF_1;
+}
+
+static
+struct wavl_tree_node *__wavl_tree_node_get_sibling(struct wavl_tree_node *node)
+{
+    struct wavl_tree_node *p_node = NULL;
+
+    WAVL_ASSERT(NULL != node);
+
+    p_node = node->parent;
+
+    if (NULL == p_node) {
+        return NULL;
+    }
+
+    return p_node->left == node ? p_node->right : p_node->left;
+}
+
+static
+void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
+                                 struct wavl_tree_node *at)
+{
+    struct wavl_tree_node *x = NULL;
+
+    WAVL_ASSERT(NULL != tree);
+    WAVL_ASSERT(NULL != at);
+
+    /* At this stage, p_x and x have a rank difference of 0. We need to promote
+     * p_x's rank, so the rank difference goes to 1. */
+
+    while (NULL != x->parent) {
+        /* For each iteration, the rank difference of x is always 0 */
+        struct wavl_tree_node *p_x = x->parent,
+                              *s_x = __wavl_tree_node_get_sibling(x);
+
+        /* Check if the parent is 0,2 */
+        if (NULL != s_x && s_x->rd == WAVL_NODE_RANK_DIFF_2) {
+            if (x == p_x->left) {
+                struct wavl_tree_node *y = x->right;
+
+                if (NULL == y || WAVL_NODE_RANK_DIFF_2 == y->rd) {
+                    /* Perform a single rotation */
+                    _wavl_tree_rotate_right_at(tree, x);
+                } else {
+                    /* Perform a double right rotation to restore rank rule */
+                    _wavl_tree_double_rotate_right_at(tree, x);
+                }
+            } else {
+                struct wavl_tree_node *y = x->left;
+
+                if (NULL == y || WAVL_NODE_RANK_DIFF_2 == y->rd) {
+                    /* Perform a single rotation */
+                    _wavl_tree_rotate_left_at(tree, x);
+                } else {
+                    /* Perform a double-left rotation to restore the rank rule */
+                    _wavl_tree_double_rotate_left_at(tree, x);
+                }
+            }
+        } else {
+            /* We know the current node has to have a rank diff of 1 */
+            x->rd = WAVL_NODE_RANK_DIFF_1;
+
+            /* Increase sibling's rank difference, if present */
+            if (NULL != s_x) {
+                WAVL_ASSERT(s_x->rd == WAVL_NODE_RANK_DIFF_1);
+                s_x->rd = WAVL_NODE_RANK_DIFF_2;
+            }
+
+            /* Decrease the rank difference of p_x */
+            if (p_x->rd == WAVL_NODE_RANK_DIFF_2) {
+                p_x->rd = WAVL_NODE_RANK_DIFF_1;
+                /* And we're done, everything is balanced per the rank rule */
+                break;
+            }
+        }
+
+        /* Keep iterating, p(x) has a rank difference of 0 atm. */
+        x = x->parent;
+    }
+}
 
 
 wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
@@ -80,8 +360,9 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
 {
     wavl_result_t ret = WAVL_ERR_OK;
 
-    struct wavl_tree_node *parent = NULL,
-                          *safe_node = NULL;
+    struct wavl_tree_node *parent = NULL;
+
+    bool was_leaf = false;
 
     WAVL_ASSERT_ARG(NULL != tree);
     WAVL_ASSERT_ARG(NULL != key);
@@ -89,8 +370,7 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
 
     node->left = node-> right = NULL;
 
-    /* Leaf nodes are always rank 0 */
-    node->rank = 0;
+    node->rd = 0;
 
     /* Check if this is an empty tree */
     if (NULL == tree->root) {
@@ -100,7 +380,7 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
     }
 
     /* Hunt for a candidate leaf to insert this node in */
-    parent = safe_node = tree->root;
+    parent = tree->root;
 
     while (NULL != parent) {
         int dir = -1;
@@ -111,8 +391,10 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
 
         if (dir < 0) {
             if (NULL == parent->left) {
+                was_leaf = parent->left == NULL && parent->right == NULL;
                 /* Stitch in the node and break */
                 parent->left = node;
+                node->parent = parent;
                 break;
             } else {
                 parent = parent->left;
@@ -120,8 +402,10 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
             break;
         } else if (dir > 0) {
             if (NULL == parent->right) {
+                was_leaf = parent->left == NULL && parent->right == NULL;
                 /* Stitch in the node and break */
                 parent->right = node;
+                node->parent = parent;
                 break;
             } else {
                 parent = parent->right;
@@ -133,7 +417,11 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
         }
     }
 
-    /* TODO: Rebalance after insertion */
+    /* Rebalance after insertion */
+    if (true == was_leaf) {
+        /* We just made a leaf into a unary node, we need to rebalance now */
+        _wavl_tree_insert_rebalance(tree, node);
+    }
 
 done:
     return ret;
@@ -231,12 +519,15 @@ void _wavl_tree_swap_in_node_at(struct wavl_tree *tree,
         /* Update the parent to point to the new node */
         if (parent->left == old) {
             parent->left = new;
+            new->parent = parent;
         } else {
             parent->right = new;
+            new->parent = parent;
         }
     } else {
         /* The old node is at the root */
         tree->root = new;
+        new->parent = NULL;
     }
 
     new->right = right;
@@ -388,37 +679,9 @@ bool wavl_test_insert(void)
     printf("WAVL: Testing simple insertion.\n");
 
     WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
-}
-
-static
-bool wavl_test_promote(void)
-{
-    struct test_node x,
-                     x_p,
-                     y;
-
-
-    struct wavl_tree_node *nd_x = &x.node,
-                          *nd_x_p = &x_p.node,
-                          *nd_y = &y.node;
-
-    printf("WAVL: Testing promotion.\n");
-
-    WAVL_TREE_NODE_CLEAR(nd_x);
-    WAVL_TREE_NODE_CLEAR(nd_x_p);
-    WAVL_TREE_NODE_CLEAR(nd_y);
-
-    nd_x->rank = 0;
-    nd_x_p->left = nd_x;
-    nd_x_p->rank = 2;
-    nd_x_p->right = nd_y;
-    nd_y->rank = 1;
-
-    _wavl_tree_promote_at(nd_x_p, nd_x);
 
     return true;
 }
-
 
 int main(int argc __attribute__((unused)), const char *argv[])
 {
@@ -427,7 +690,7 @@ int main(int argc __attribute__((unused)), const char *argv[])
     fprintf(stderr, "%s: tester\n", argv[0]);
 
     wavl_test_init();
-    wavl_test_promote();
+    wavl_test_insert();
 
     ret = EXIT_SUCCESS;
     return ret;

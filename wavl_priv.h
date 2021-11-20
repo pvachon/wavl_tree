@@ -43,6 +43,17 @@ typedef uint32_t wavl_result_t;
 #define WAVL_UNLIKELY(_b)               __builtin_expect(!!(_b), 0)
 
 /**
+ * Node rank difference is 1
+ */
+#define WAVL_NODE_RANK_DIFF_1           0
+
+/**
+ * Node rank dfference is 2
+ */
+#define WAVL_NODE_RANK_DIFF_2           1
+
+
+/**
  * Container-of macro
  * \param pointer Node pointer
  * \param type The target type of the containing structure
@@ -115,18 +126,24 @@ typedef wavl_result_t (*wavl_key_to_node_compare_func_t)(void *key_lhs,
                                                          int *pdir);
 
 /**
- * A WAVL-tree node. Our nodes only track left and right children.
+ * A WAVL-tree node.
  */
 struct wavl_tree_node {
     struct wavl_tree_node *left,    /**< Left-hand child; NULL if not present */
                           *right;   /**< Right-hand child; NULL if not present */
-    int rank;                       /**< The rank of this node */
+    struct wavl_tree_node *parent;  /**< The parent of this node */
+    int rd;                         /**< Rank difference - rd = r(p(x)) - r(x) - 1 */
 };
+
+/**
+ * Create an empty node, through assignment
+ */
+#define WAVL_TREE_NODE_EMPTY    (struct wavl_tree_node){ .left = NULL, .right = NULL, .parent = NULL, .rd = 0}
 
 /**
  * Clear a newly allocated WAVL tree node.
  */
-#define WAVL_TREE_NODE_CLEAR(_n) do { (_n)->left = (_n)->right = NULL; (_n)->rank = -1; } while (0)
+#define WAVL_TREE_NODE_CLEAR(_n) do { (_n)->left = (_n)->right = (_n)->parent = NULL; (_n)->rd = 0; } while (0)
 
 /**
  * A WAVL tree

@@ -559,25 +559,27 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
 {
     wavl_result_t ret = WAVL_ERR_OK;
 
+    struct wavl_tree_node *splice_y = NULL,
+                          *child_y = NULL;
+
     WAVL_ASSERT_ARG(NULL != tree);
     WAVL_ASSERT_ARG(NULL != node);
 
-    if (NULL == node->left) {
-        /* Shift up the right-most node */
-    } else if (NULL == node->right) {
-        /* Shift up the left-most node */
+    /* Figure out which node we need to splice out */
+    if (NULL == node->left || NULL == node->right) {
+        splice_y = node;
     } else {
-        /* Find the successor */
-
-        struct wavl_tree_node *succ = _wavl_tree_find_minimum_at(node->right);
-
-        if (succ != node->right) {
-            /* Replace successor with successor's right tree */
-        }
-
-        /* Replace node to delete with successor we found */
-
+        splice_y = _wavl_tree_find_minimum_at(node->right);
     }
+
+    /* Find the child of the node to splice */
+    if (NULL != splice_y->left) {
+        child_y = splice_y->left;
+    } else {
+        child_y = splice_y->right;
+    }
+
+
 
     /* WAVL fixups */
 

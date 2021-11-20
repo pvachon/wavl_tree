@@ -381,6 +381,16 @@ bool wavl_test_init(void)
 }
 
 static
+bool wavl_test_insert(void)
+{
+    struct wavl_tree tree;
+
+    printf("WAVL: Testing simple insertion.\n");
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
+}
+
+static
 bool wavl_test_promote(void)
 {
     struct test_node x,

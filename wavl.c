@@ -64,6 +64,8 @@ void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
                           *z = NULL,
                           *p_z = NULL;
 
+    fprintf(stderr, "Double rotate right\n");
+
     WAVL_ASSERT(NULL != tree);
     WAVL_ASSERT(NULL != x);
 
@@ -174,6 +176,8 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
 
     WAVL_ASSERT(NULL != tree);
     WAVL_ASSERT(NULL != x);
+
+    fprintf(stderr, "Double rotate left\n");
 
     y = x->left;
     z = x->parent;
@@ -409,7 +413,6 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
             } else {
                 parent = parent->left;
             }
-            break;
         } else if (dir > 0) {
             if (NULL == parent->right) {
                 was_leaf = parent->left == NULL && parent->right == NULL;
@@ -654,8 +657,13 @@ void wavl_test_dump_tree(struct test_node *start, size_t nr_nodes)
     for (size_t i = 0; i < nr_nodes; i++) {
         struct test_node *tnode = &start[i];
         struct wavl_tree_node *node = &tnode->node;
+        struct test_node *parent = TEST_NODE(node->parent);
 
-        fprintf(stderr, "  %d [label=\"%d | %c\"];\n", tnode->id, tnode->id, node->rp == true ? 'T' : 'F');
+        if (NULL != node->parent) {
+            fprintf(stderr, "  %d [label=\"%d | P = %c | p = %d\"];\n", tnode->id, tnode->id, node->rp == true ? 'T' : 'F', parent->id);
+        } else {
+            fprintf(stderr, "  %d [label=\"%d | P = %c | NO PARENT\"];\n", tnode->id, tnode->id, node->rp == true ? 'T' : 'F');
+        }
 
         if (NULL == node->left) {
             fprintf(stderr, "  null%zu [shape=point];\n", null_cnt);
@@ -735,7 +743,7 @@ bool wavl_test_init(void)
 }
 
 static
-bool wavl_test_insert(void)
+bool wavl_test_simple_insert(void)
 {
     struct wavl_tree tree;
 
@@ -746,9 +754,32 @@ bool wavl_test_insert(void)
     WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
 
     for (size_t i = 0; i < sizeof(nodes)/sizeof(struct test_node); i++) {
-        printf("Inserting node %zu\n", i);
+        //printf("Inserting node %zu\n", i);
         nodes[i].id = (int)i;
         WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)(uint64_t)i, &nodes[i].node));
+    }
+
+    return true;
+}
+
+static
+bool wavl_test_sign_invert_insert(void)
+{
+    struct wavl_tree tree;
+    int node_id = 0, sign = -1;
+
+    printf("WAVL: Testing sign inverting insertion.\n");
+
+    wavl_test_clear();
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
+
+    for (size_t i = 0; i < sizeof(nodes)/sizeof(struct test_node); i++) {
+        nodes[i].id = sign * node_id;
+        printf("Inserting node %d\n", nodes[i].id);
+        WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)(int64_t)nodes[i].id, &nodes[i].node));
+        node_id += 1;
+        sign = -sign;
     }
 
     wavl_test_dump_tree(nodes, sizeof(nodes)/sizeof(struct test_node));
@@ -763,7 +794,8 @@ int main(int argc __attribute__((unused)), const char *argv[])
     fprintf(stderr, "%s: tester\n", argv[0]);
 
     wavl_test_init();
-    wavl_test_insert();
+    wavl_test_simple_insert();
+    wavl_test_sign_invert_insert();
 
     ret = EXIT_SUCCESS;
     return ret;

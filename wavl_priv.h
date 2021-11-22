@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 /**
  * A normal WAVL tree result
@@ -132,18 +133,18 @@ struct wavl_tree_node {
     struct wavl_tree_node *left,    /**< Left-hand child; NULL if not present */
                           *right;   /**< Right-hand child; NULL if not present */
     struct wavl_tree_node *parent;  /**< The parent of this node */
-    int rd;                         /**< Rank difference - rd = r(p(x)) - r(x) - 1 */
+    bool rp;                         /**< Rank parity */
 };
 
 /**
  * Create an empty node, through assignment
  */
-#define WAVL_TREE_NODE_EMPTY    (struct wavl_tree_node){ .left = NULL, .right = NULL, .parent = NULL, .rd = 0}
+#define WAVL_TREE_NODE_EMPTY    (struct wavl_tree_node){ .left = NULL, .right = NULL, .parent = NULL, .rp = false}
 
 /**
  * Clear a newly allocated WAVL tree node.
  */
-#define WAVL_TREE_NODE_CLEAR(_n) do { (_n)->left = (_n)->right = (_n)->parent = NULL; (_n)->rd = 0; } while (0)
+#define WAVL_TREE_NODE_CLEAR(_n) do { (_n)->left = (_n)->right = (_n)->parent = NULL; (_n)->rp = false; } while (0)
 
 /**
  * A WAVL tree

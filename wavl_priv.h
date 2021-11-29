@@ -30,6 +30,7 @@ typedef uint32_t wavl_result_t;
 #define WAVL_ERR_BAD_ARG                WAVL_ERROR(WAVL_SYS_CORE, 0) /**< Bad argument, i.e. unexpected NULL */
 
 #define WAVL_ERR_TREE_DUPE              WAVL_ERROR(WAVL_SYS_TREE, 0)    /**< Item to be inserted is a duplicate */
+#define WAVL_ERR_TREE_NOT_FOUND         WAVL_ERROR(WAVL_SYS_TREE, 1)    /**< Item not found in the tree */
 
 /**
  * Predicate to check if result code is OK

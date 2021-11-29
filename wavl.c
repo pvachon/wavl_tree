@@ -281,21 +281,6 @@ struct wavl_tree_node *__wavl_tree_node_get_sibling(struct wavl_tree_node *node)
     return p_node->left == node ? p_node->right : p_node->left;
 }
 
-/*
- * Parities truth table
- *
- *  +------+------+---------+-----------+
- *  | n, n | P[x] | P[p(x)] | P[sib(x)] |
- *  +------+------+---------+-----------+
- *  | 0, 1 |  1   |    1    |     0     |
- *  | 0, 1 |  0   |    0    |     1     |
- *  | 1, 1 |  0   |    1    |     0     |
- *  | 1, 1 |  1   |    0    |     1     |
- *  | 0, 2 |  1   |    1    |     1     |
- *  | 0, 2 |  0   |    0    |     0     |
- *  +------+------+---------+-----------+
- */
-
 static
 void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
                                  struct wavl_tree_node *at)
@@ -477,6 +462,8 @@ wavl_result_t wavl_tree_find(struct wavl_tree *tree,
         }
     }
 
+    ret = WAVL_ERR_TREE_NOT_FOUND;
+
 done:
     return ret;
 }
@@ -562,61 +549,222 @@ void _wavl_tree_swap_in_node_at(struct wavl_tree *tree,
 }
 
 /**
- * While insertion and search are pretty straightforward, removal is a bit more complex.
+ * Rebalance the tree after removing the node, where p_x is the parent of the removed node,
+ * and x is the node that was promoted or spliced in.
  *
- * We need to effectively consider 3 cases for removal:
- * 1. Where the node has no children (just delete it)
- * 2. Where the node has one child subtree (left or right - promote the child)
- * 3. Where the node has two children subtrees
+ * Handle the specific case where a 2 child was removed, resulting in a 3-child.
+ *
+ * \param tree The tree we are updating
+ * \param p_n The parent of the removed node.
+ * \param n The node that replaced the removed node.
+ *
+ * Note that the rank difference between n and p_n is 3 at entry to this function.
+ */
+static
+void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
+                                         struct wavl_tree_node *p_n,
+                                         struct wavl_tree_node *n)
+{
+    struct wavl_tree_node *x = NULL,
+                          *p_x = NULL;
+
+    WAVL_ASSERT(NULL != tree);
+    WAVL_ASSERT(NULL != p_n);
+
+    /* Start with rebalancing X */
+    x = n;
+    p_x = p_n;
+
+    /*
+     * By the conventions in the paper:
+     * - x is a 3-child of p_x
+     * - p_x is the parent that we might need in rebalancing
+     * - y is the sibling of x
+     */
+
+    /* TODO: rethink this boundary condition, we should incude a check
+     * if the nodes are 3, 1 and just break immediately
+     */
+    do {
+        struct wavl_tree_node *y = __wavl_tree_node_get_sibling(x),
+                              *p_p_x = p_x->parent;
+
+        creates_3_node = p_p_x != NULL && p_x->rp == p_p_x->rp;
+
+        /* Figure out which demote case we have */
+        if (p_x->rp == y->rp) {
+            /* Distance between x_p and y is 2, so just demote r_p */
+            __wavl_tree_node_demote(p_x);
+        } else {
+            if (y->rp == __wavl_tree_get_node_parity(y->left) &&
+                    y->rp == __wavl_tree_get_node_parity(y->right))
+            {
+                /* Y is 2, 2, so we can just demote p_x and y */
+                __wavl_tree_node_demote(p_x);
+                __wavl_tree_node_demote(y);
+            } else {
+                /* We are at the point where we need to do some rotations to
+                 * restore balance to the tree.
+                 */
+                break;
+            }
+        }
+
+        /* Keep climbing the tree */
+        x = p_x;
+        p_x = p_p_x;
+    } while (NULL != p_x && true == creates_3_node);
+
+    if (false == creates_3_node) {
+        /* We're done, balance has been restored */
+        return;
+    }
+
+    /* Otherwise, we need to do some legwork to restore balance */
+
+}
+
+/**
+ * Deletion created a 2,2 leaf at leaf. Fix up the leaf, and figure out
+ * where that leaves us.
+ */
+static
+void _wavl_tree_delete_rebalance_2_2_leaf(struct wavl_tree *tree,
+                                          struct wavl_tree_node *leaf)
+{
+    struct wavl_tree_node *p_x = NULL,
+                          *p_p_x = NULL,
+                          *x = leaf;
+
+    WAVL_ASSERT(NULL != tree);
+    WAVL_ASSERT(NULL != leaf);
+
+    p_x = leaf->parent;
+    p_p_x = p_x->parent;
+
+    if (p_x->rp == p_p_x->rp) {
+        /* p_x is a 2-child, so we will need to kick off the 3,1/1,3 rebalancing */
+        __wavl_tree_node_demote(p_x);
+        _wavl_tree_delete_rebalance_3_child(tree, p_x, p_p_x);
+    } else {
+        /* Just demote p_x and carry on (p_x is now a 2-child) */
+        __wavl_tree_node_demote(p_x);
+    }
+
+}
+
+
+/**
+ * Remove the given node from the tree.
+ *
+ * While insertion and search are pretty straightforward, removal is a bit more work.
+ *
+ * We need to consider 3 cases during removal from a binary search tree
+ * 1. Where the node has no children (just delete it) - a leaf node
+ * 2. Where the node has one child subtree (left or right - promote the child) - unary node
+ * 3. Where the node has two children - binary node
  *
  * For the third case, we need to find the appropriate replacement for the node we are
  * deleting, which is effectively the successor (next) node to the node we are deleting.
- * We promote the successor to current node's position.
+ * We promote the successor to current node's position. The successor is usually a unary
+ * node or a leaf.
  *
- * The successor, by definition, has to be in the right subtree of the node to be deleted
- * in case 3. We seek a successor on the right branch (g.t. branch
+ * When we splice in the replacement node in case 3, we need to track where we removed the
+ * successor node from. The spliced in node takes on the exact same rank as the removed
+ * node.
+ *
+ * Once we have a candidate node, we have to start rebalancing. To start the rebalancing
+ * process off, we need to consider, if the node removed:
+ *  * was a leaf, and 1-child of a unary node, we have a 2,2 leaf to fix
+ *  * was a 2-child of a node
  */
 wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
                                struct wavl_tree_node *node)
 {
     wavl_result_t ret = WAVL_ERR_OK;
 
-    struct wavl_tree_node *splice_y = NULL,
-                          *child_x = NULL;
+    struct wavl_tree_node *y = NULL,
+                          *x = NULL,
+                          *p_x = NULL,
+                          *p_y = NULL;
+
+    bool is_2_child = false,
+         was_leaf = false;
 
     WAVL_ASSERT_ARG(NULL != tree);
     WAVL_ASSERT_ARG(NULL != node);
 
-    /* Figure out which node we need to splice out */
+    /* Figure out which node we need to splice in, replacing node */
     if (NULL == node->left || NULL == node->right) {
-        splice_y = node;
+        y = node;
     } else {
-        splice_y = _wavl_tree_find_minimum_at(node->right);
+        /* Find the minimum of the right subtree of the node to be deleted, to
+         * find the replacement for node. We'll need to fix up the tree at the
+         * original location of y.
+         */
+        y = _wavl_tree_find_minimum_at(node->right);
     }
 
     /* Find the child of the node to splice we will move up */
-    if (NULL != splice_y->left) {
-        child_x = splice_y->left;
+    if (NULL != y->left) {
+        x = y->left;
     } else {
-        child_x = splice_y->right;
+        x = y->right;
+        was_leaf = x == NULL;
     }
 
-    /* Splice out the node to delete */
-    if (NULL != child_x) {
-        child_x->parent = splice_y->parent;
+    /* "Promote" the child of the node to be removed*/
+    if (NULL != x) {
+        x->parent = y->parent;
     }
 
-    if (NULL == child_x->parent) {
-        tree->root = child_x;
+    p_y = y->parent;
+    if (NULL == p_y) {
+        /* We're deleting the root, so swap in the new candidate */
+        tree->root = x;
     } else {
-        child_x->parent = splice_y->parent;
+        /* Check if y is a 2-child of its parent */
+        is_2_child = y->rp == p_y->rp;
 
+        /* Ensure the right/left pointer of the parent of the node to
+         * be spliced out points to its new child
+         */
+        if (y == p_y->left) {
+            p_y->left = x;
+        } else {
+            p_y->right = x;
+        }
     }
 
-    /* WAVL fixups */
+    /*
+     * At this point, y is either a node to splice in to replace the node to be deleted, or is
+     * the deleted node itself. If y is a node to splice in, do so now.
+     */
+    if (y != node) {
+        _wavl_tree_swap_in_node_at(tree, node, y);
+    }
 
-    /* Clear the node's metadata out */
-    node->left = node->right = NULL;
+    /*
+     * x is the new child we spliced in. p_y is its new parent. Fix up the tree so the wavl
+     * constraints are restored.
+     *
+     * We know we have to restore constraints if:
+     *  * y was a 2-child of p_y (note that x is NULL in this case)
+     *  * y was a leaf, 1-child of p_y; p_y is unary.
+     */
+    if (NULL != x->parent) {
+        if (true == is_2_child) {
+            /* x is a 3-child of p_y, so we need to start handling that caase */
+            _wavl_tree_delete_rebalance_3_child(tree, p_y, x);
+
+        } else {
+            _wavl_tree_delete_rebalance_2_2_leaf(tree, p_y);
+        }
+    }
+
+    /* Clear the removed node's metadata out */
+    node->left = node->right = node->parent = NULL;
+    node->rp = false;
 
     return ret;
 }

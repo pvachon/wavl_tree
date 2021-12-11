@@ -32,6 +32,15 @@ void __wavl_tree_node_promote(struct wavl_tree_node *n)
 }
 
 /**
+ * Promote the given node's rank, twice.
+ */
+static inline
+void __wavl_tree_node_double_promote(struct wavl_tree_node *n)
+{
+    WAVL_ASSERT(NULL != n);
+}
+
+/**
  * Demote the given node's rank.
  */
 static inline
@@ -40,6 +49,15 @@ void __wavl_tree_node_demote(struct wavl_tree_node *n)
     WAVL_ASSERT(NULL != n);
 
     n->rp = !n->rp;
+}
+
+/**
+ * Demote the given node's rank, twice.
+ */
+static inline
+void __wavl_tree_node_double_demote(struct wavl_tree_node *n)
+{
+    WAVL_ASSERT(NULL != n);
 }
 
 /**
@@ -52,9 +70,35 @@ bool __wavl_tree_get_node_parity(struct wavl_tree_node *n)
 }
 
 /**
+ * Check if a node is a 2-child.
+ */
+static inline
+bool __wavl_tree_node_is_2_child(struct wavl_tree_node *n, struct wavl_tree_node *p_n)
+{
+    /* If the node is unary and n is NULL, then we know n is a 2-node */
+    bool p_is_unary = (p_n->left == NULL || p_n->right == NULL) && p_n->left != p_n->right;
+
+    return p_is_unary && NULL == n
+        ? true
+        : __wavl_tree_get_node_parity(n) == __wavl_tree_get_node_parity(p_n);
+}
+
+/**
+ * Return whether or not the given node is a leaf
+ */
+static inline
+bool __wavl_tree_node_is_leaf(struct wavl_tree_node *n)
+{
+    return NULL == n->left && NULL == n->right;
+}
+
+/**
  * Perform a double-right rotation of the node x. We could do this using the other
  * rotate primitives, but for the sake of efficiency we will directly implement
  * the rotation.
+ *
+ * Note that this function only performs the tree restructuring. Rank adjustments
+ * must be handled by the caller.
  */
 static
 void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
@@ -85,9 +129,6 @@ void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
         tree->root = y;
     }
 
-    /* Promote Y's rank */
-    __wavl_tree_node_promote(y);
-
     /* Move y's left subtree (since x < left(y)) to x's right subtree */
     x->right = y->left;
 
@@ -98,7 +139,6 @@ void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
 
     y->left = x;
     x->parent = y;
-    __wavl_tree_node_demote(x);
 
     /* Move y's right subtree (since z > right(y)) to z's left subtree */
     z->left = y->right;
@@ -110,7 +150,6 @@ void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
 
     y->right = z;
     z->parent = y;
-    __wavl_tree_node_demote(z);
 }
 
 /**
@@ -154,8 +193,6 @@ void _wavl_tree_rotate_right_at(struct wavl_tree *tree,
     x->right = z;
     z->parent = x;
 
-    __wavl_tree_node_demote(z);
-
     /* Make y the left-child of z */
     z->left = y;
     if (NULL != y) {
@@ -165,6 +202,9 @@ void _wavl_tree_rotate_right_at(struct wavl_tree *tree,
 
 /**
  * Perform a dobule-left rotation of the node x.
+ *
+ * Note that this function performs a double rotate restructuring, but
+ * does not update the ranks. Updating the ranks is up to the caller.
  */
 static
 void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
@@ -195,9 +235,6 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
         tree->root = y;
     }
 
-    /* Promote Y's rank */
-    __wavl_tree_node_promote(y);
-
     /* Move y's left subtree to z's right subtree (z < right(y)) */
     z->right = y->left;
     if (NULL != y->left) {
@@ -207,7 +244,6 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
 
     y->left = z;
     z->parent = y;
-    __wavl_tree_node_demote(z);
 
     /* Move y's right subtree to x's left */
     x->right = y->right;
@@ -218,7 +254,6 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
 
     y->right = x;
     x->parent = y;
-    __wavl_tree_node_demote(x);
 }
 
 /**
@@ -255,8 +290,6 @@ void _wavl_tree_rotate_left_at(struct wavl_tree *tree,
     /* make z the left-child of x */
     x->left = z;
     z->parent = x;
-
-    __wavl_tree_node_demote(z);
 
     /* Maye y the right-child of z */
     z->right = y;
@@ -328,15 +361,24 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
     /* p(x) is 2,0 or 0,2. Determine the type of rotation needed to restore the
      * rank rule.
      */
+    struct wavl_tree_node *z = x->parent;
     if (x == p_x->left) {
         struct wavl_tree_node *y = x->right;
 
         if (NULL == y || y->rp == par_x) {
             /* If y is NULL or y is 2 distance (parities are equal), do a single rotation */
             _wavl_tree_rotate_right_at(tree, x);
+            if (NULL != z) {
+                __wavl_tree_node_demote(z);
+            }
         } else {
             /* Perform a double right rotation to restore rank rule */
             _wavl_tree_double_rotate_right_at(tree, x);
+            __wavl_tree_node_promote(y);
+            __wavl_tree_node_demote(x);
+            if (NULL != z) {
+                __wavl_tree_node_demote(z);
+            }
         }
     } else {
         struct wavl_tree_node *y = x->left;
@@ -344,9 +386,17 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
         if (NULL == y || y->rp == par_x) {
             /* Perform a single rotation */
             _wavl_tree_rotate_left_at(tree, x);
+            if (NULL != z) {
+                __wavl_tree_node_demote(z);
+            }
         } else {
             /* Perform a double-left rotation to restore the rank rule */
             _wavl_tree_double_rotate_left_at(tree, x);
+            __wavl_tree_node_promote(y);
+            __wavl_tree_node_demote(x);
+            if (NULL != z) {
+                __wavl_tree_node_demote(z);
+            }
         }
     }
 
@@ -566,7 +616,10 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
                                          struct wavl_tree_node *n)
 {
     struct wavl_tree_node *x = NULL,
-                          *p_x = NULL;
+                          *p_x = NULL,
+                          *y = NULL;
+    bool creates_3_node = false,
+         done = false;
 
     WAVL_ASSERT(NULL != tree);
     WAVL_ASSERT(NULL != p_n);
@@ -582,30 +635,27 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
      * - y is the sibling of x
      */
 
-    /* TODO: rethink this boundary condition, we should incude a check
-     * if the nodes are 3, 1 and just break immediately
-     */
     do {
-        struct wavl_tree_node *y = __wavl_tree_node_get_sibling(x),
-                              *p_p_x = p_x->parent;
+        struct wavl_tree_node *p_p_x = p_x->parent;
+        y = p_x->left == x ? p_x->right : p_x->left;
 
-        creates_3_node = p_p_x != NULL && p_x->rp == p_p_x->rp;
+        /* Check if the next step will create a 3-node of P(x) */
+        creates_3_node = p_p_x != NULL &&
+            __wavl_tree_get_node_parity(p_x) == __wavl_tree_get_node_parity(p_p_x);
 
         /* Figure out which demote case we have */
-        if (p_x->rp == y->rp) {
-            /* Distance between x_p and y is 2, so just demote r_p */
+        if (__wavl_tree_node_is_2_child(y, p_x)) {
+            /* y is a 2-child, x is a 3 child, simply demote the parent */
             __wavl_tree_node_demote(p_x);
         } else {
             if (y->rp == __wavl_tree_get_node_parity(y->left) &&
-                    y->rp == __wavl_tree_get_node_parity(y->right))
+                y->rp == __wavl_tree_get_node_parity(y->right))
             {
                 /* Y is 2, 2, so we can just demote p_x and y */
                 __wavl_tree_node_demote(p_x);
                 __wavl_tree_node_demote(y);
             } else {
-                /* We are at the point where we need to do some rotations to
-                 * restore balance to the tree.
-                 */
+                done = false;
                 break;
             }
         }
@@ -615,13 +665,49 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
         p_x = p_p_x;
     } while (NULL != p_x && true == creates_3_node);
 
-    if (false == creates_3_node) {
-        /* We're done, balance has been restored */
+    if (true == done) {
+        /* We're done, there should be no more violations of the WAVL constraint */
         return;
     }
 
-    /* Otherwise, we need to do some legwork to restore balance */
-
+    /* Otherwise, perform rotations needed to restore balance */
+    struct wavl_tree_node *z = p_x;
+    if (x == p_x->left) {
+        struct wavl_tree_node *w = y->right;
+        if (__wavl_tree_get_node_parity(w) != __wavl_tree_get_node_parity(y)) {
+            /* w is a 1-child of y */
+            _wavl_tree_rotate_left_at(tree, y);
+            __wavl_tree_node_promote(y);
+            __wavl_tree_node_demote(z);
+            if (__wavl_tree_node_is_leaf(z)) {
+                __wavl_tree_node_demote(z);
+            }
+        } else {
+            struct wavl_tree_node *v = y->left;
+            /* w is a 2-child of y, thus v must be a 1-child */
+            _wavl_tree_double_rotate_left_at(tree, v);
+            __wavl_tree_node_double_promote(v);
+            __wavl_tree_node_demote(y);
+            __wavl_tree_node_double_demote(z);
+        }
+    } else {
+        struct wavl_tree_node *w = y->left;
+        if (__wavl_tree_get_node_parity(w) != __wavl_tree_get_node_parity(y)) {
+            /* w is a 1-child of y */
+            _wavl_tree_rotate_right_at(tree, y);
+            __wavl_tree_node_promote(y);
+            __wavl_tree_node_demote(z);
+            if (__wavl_tree_node_is_leaf(z)) {
+                __wavl_tree_node_demote(z);
+            }
+        } else {
+            struct wavl_tree_node *v = y->right;
+            _wavl_tree_double_rotate_right_at(tree, v);
+            __wavl_tree_node_double_promote(v);
+            __wavl_tree_node_demote(y);
+            __wavl_tree_node_double_demote(z);
+        }
+    }
 }
 
 /**
@@ -633,24 +719,23 @@ void _wavl_tree_delete_rebalance_2_2_leaf(struct wavl_tree *tree,
                                           struct wavl_tree_node *leaf)
 {
     struct wavl_tree_node *p_x = NULL,
-                          *p_p_x = NULL,
                           *x = leaf;
 
     WAVL_ASSERT(NULL != tree);
     WAVL_ASSERT(NULL != leaf);
 
     p_x = leaf->parent;
-    p_p_x = p_x->parent;
 
-    if (p_x->rp == p_p_x->rp) {
-        /* p_x is a 2-child, so we will need to kick off the 3,1/1,3 rebalancing */
-        __wavl_tree_node_demote(p_x);
-        _wavl_tree_delete_rebalance_3_child(tree, p_x, p_p_x);
+    if (p_x->rp == x->rp) {
+        /* The leaf was a 2-child, so we will need to kick off the 3,1/1,3 rebalancing */
+        __wavl_tree_node_demote(x);
+
+        /* p_x is now a 3-child, so we need to proceed with a normal 3-child rebalance */
+        _wavl_tree_delete_rebalance_3_child(tree, x, p_x);
     } else {
-        /* Just demote p_x and carry on (p_x is now a 2-child) */
-        __wavl_tree_node_demote(p_x);
+        /* Just demote the leaf and carry on (leaf is now a 2-child) */
+        __wavl_tree_node_demote(x);
     }
-
 }
 
 
@@ -688,8 +773,7 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
                           *p_x = NULL,
                           *p_y = NULL;
 
-    bool is_2_child = false,
-         was_leaf = false;
+    bool is_2_child = false;
 
     WAVL_ASSERT_ARG(NULL != tree);
     WAVL_ASSERT_ARG(NULL != node);
@@ -705,15 +789,15 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
         y = _wavl_tree_find_minimum_at(node->right);
     }
 
+
     /* Find the child of the node to splice we will move up */
     if (NULL != y->left) {
         x = y->left;
     } else {
         x = y->right;
-        was_leaf = x == NULL;
     }
 
-    /* "Promote" the child of the node to be removed*/
+    /* Splice in the child of the node to be removed */
     if (NULL != x) {
         x->parent = y->parent;
     }
@@ -724,7 +808,7 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
         tree->root = x;
     } else {
         /* Check if y is a 2-child of its parent */
-        is_2_child = y->rp == p_y->rp;
+        is_2_child = __wavl_tree_node_is_2_child(y, p_y);
 
         /* Ensure the right/left pointer of the parent of the node to
          * be spliced out points to its new child
@@ -752,12 +836,15 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
      *  * y was a 2-child of p_y (note that x is NULL in this case)
      *  * y was a leaf, 1-child of p_y; p_y is unary.
      */
-    if (NULL != x->parent) {
+    if (NULL != p_y) {
         if (true == is_2_child) {
             /* x is a 3-child of p_y, so we need to start handling that caase */
             _wavl_tree_delete_rebalance_3_child(tree, p_y, x);
 
-        } else {
+        } else if (NULL == x && __wavl_tree_node_is_leaf(p_y)) {
+            /* p_y is a 2,2 leaf, so we need to fix it up and figure out if this
+             * will result in p_y becoming a 3-child
+             */
             _wavl_tree_delete_rebalance_2_2_leaf(tree, p_y);
         }
     }
@@ -805,6 +892,11 @@ void wavl_test_dump_tree(struct test_node *start, size_t nr_nodes)
     for (size_t i = 0; i < nr_nodes; i++) {
         struct test_node *tnode = &start[i];
         struct wavl_tree_node *node = &tnode->node;
+
+        if (NULL == node->parent && NULL == node->left && NULL == node->right) {
+            continue;
+        }
+
         struct test_node *parent = TEST_NODE(node->parent);
 
         if (NULL != node->parent) {
@@ -924,26 +1016,112 @@ bool wavl_test_sign_invert_insert(void)
 
     for (size_t i = 0; i < sizeof(nodes)/sizeof(struct test_node); i++) {
         nodes[i].id = sign * node_id;
-        printf("Inserting node %d\n", nodes[i].id);
         WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)(int64_t)nodes[i].id, &nodes[i].node));
         node_id += 1;
         sign = -sign;
     }
 
-    wavl_test_dump_tree(nodes, sizeof(nodes)/sizeof(struct test_node));
+    //wavl_test_dump_tree(nodes, sizeof(nodes)/sizeof(struct test_node));
 
     return true;
 }
+
+static
+bool wavl_test_delete_leaf_unary_sibling(void)
+{
+    struct wavl_tree tree;
+    int node_id = 0, sign = -1;
+
+    printf("WAVL: Testing deleting a leaf node with unary sibling.\n");
+
+    wavl_test_clear();
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
+
+    for (size_t i = 0; i < 16; i++) {
+        nodes[i].id = sign * node_id;
+        WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)(int64_t)nodes[i].id, &nodes[i].node));
+        node_id += 1;
+        sign = -sign;
+    }
+
+    /* Remove node 9 from the tree. Node 9 is a 2-child of node 11. */
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(&tree, &nodes[9].node));
+
+    wavl_test_dump_tree(nodes, 16);
+
+    return true;
+}
+
+static
+bool wavl_test_delete_leaf_leaf_sibling(void)
+{
+    struct wavl_tree tree;
+    int node_id = 0, sign = -1;
+
+    printf("WAVL: Testing deleting a leaf node with a leaf sibling.\n");
+
+    wavl_test_clear();
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
+
+    for (size_t i = 0; i < 16; i++) {
+        nodes[i].id = sign * node_id;
+        WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)(int64_t)nodes[i].id, &nodes[i].node));
+        node_id += 1;
+        sign = -sign;
+    }
+
+    /* Remove node -14 from the tree. Node -14 is a 1-child of node -12. */
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(&tree, &nodes[14].node));
+    /* Remove node -10 */
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(&tree, &nodes[10].node));
+
+    //wavl_test_dump_tree(nodes, 16);
+
+    return true;
+
+}
+
+static
+bool wavl_test_delete_inner_1(void)
+{
+    struct wavl_tree tree;
+    int node_id = 0, sign = -1;
+
+    printf("WAVL: Testing deleting an inner node.\n");
+
+    wavl_test_clear();
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
+
+    for (size_t i = 0; i < 16; i++) {
+        nodes[i].id = sign * node_id;
+        WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)(int64_t)nodes[i].id, &nodes[i].node));
+        node_id += 1;
+        sign = -sign;
+    }
+
+    /* Remove node 9 from the tree. Node 9 is a 2-child of node 11. */
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(&tree, &nodes[9].node));
+
+    wavl_test_dump_tree(nodes, 16);
+
+    return true;
+}
+
 
 int main(int argc __attribute__((unused)), const char *argv[])
 {
     int ret = EXIT_FAILURE;
 
-    fprintf(stderr, "%s: tester\n", argv[0]);
+    fprintf(stdout, "%s: tester\n", argv[0]);
 
     wavl_test_init();
     wavl_test_simple_insert();
     wavl_test_sign_invert_insert();
+    wavl_test_delete_leaf_leaf_sibling();
+    wavl_test_delete_leaf_unary_sibling();
 
     ret = EXIT_SUCCESS;
     return ret;

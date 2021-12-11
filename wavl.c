@@ -76,11 +76,14 @@ static inline
 bool __wavl_tree_node_is_2_child(struct wavl_tree_node *n, struct wavl_tree_node *p_n)
 {
     /* If the node is unary and n is NULL, then we know n is a 2-node */
+#if 0
     bool p_is_unary = (p_n->left == NULL || p_n->right == NULL) && p_n->left != p_n->right;
 
     return p_is_unary && NULL == n
         ? true
         : __wavl_tree_get_node_parity(n) == __wavl_tree_get_node_parity(p_n);
+#endif
+    return __wavl_tree_get_node_parity(n) == __wavl_tree_get_node_parity(p_n);
 }
 
 /**
@@ -789,7 +792,6 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
         y = _wavl_tree_find_minimum_at(node->right);
     }
 
-
     /* Find the child of the node to splice we will move up */
     if (NULL != y->left) {
         x = y->left;
@@ -816,6 +818,7 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
         if (y == p_y->left) {
             p_y->left = x;
         } else {
+            WAVL_ASSERT(p_y->right == y);
             p_y->right = x;
         }
     }
@@ -826,6 +829,9 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
      */
     if (y != node) {
         _wavl_tree_swap_in_node_at(tree, node, y);
+        if (node == p_y) {
+            p_y = y;
+        }
     }
 
     /*
@@ -841,7 +847,7 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
             /* x is a 3-child of p_y, so we need to start handling that caase */
             _wavl_tree_delete_rebalance_3_child(tree, p_y, x);
 
-        } else if (NULL == x && __wavl_tree_node_is_leaf(p_y)) {
+        } else if (NULL == x && p_y->left == p_y->right) {
             /* p_y is a 2,2 leaf, so we need to fix it up and figure out if this
              * will result in p_y becoming a 3-child
              */
@@ -1053,6 +1059,9 @@ bool wavl_test_delete_leaf_unary_sibling(void)
     return true;
 }
 
+/*
+ * Test an iteration of the 2,2 leaf rebalance case.
+ */
 static
 bool wavl_test_delete_leaf_leaf_sibling(void)
 {
@@ -1102,10 +1111,45 @@ bool wavl_test_delete_inner_1(void)
         sign = -sign;
     }
 
-    /* Remove node 9 from the tree. Node 9 is a 2-child of node 11. */
-    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(&tree, &nodes[9].node));
+    /* Remove node -8 from the tree. Node -8 is a 2-child of node 0. */
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(&tree, &nodes[8].node));
 
-    wavl_test_dump_tree(nodes, 16);
+    //wavl_test_dump_tree(nodes, 16);
+
+    return true;
+}
+
+static
+bool wavl_test_delete_every_third(void)
+{
+    struct wavl_tree tree;
+    int node_id = 0, sign = -1;
+    const size_t nr_nodes = 32; //sizeof(nodes)/sizeof(struct test_node);
+
+    printf("WAVL: Testing sign inverting insertion.\n");
+
+    wavl_test_clear();
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
+
+    for (size_t i = 0; i < nr_nodes; i++) {
+        nodes[i].id = sign * node_id;
+        WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)(int64_t)nodes[i].id, &nodes[i].node));
+        node_id += 1;
+        sign = -sign;
+    }
+
+    for (size_t i = 2; i < nr_nodes; i += 3) {
+        if (14 == i) {
+            wavl_test_dump_tree(nodes, nr_nodes);
+            return false;
+        }
+        WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(&tree, &nodes[i].node));
+    }
+
+    wavl_test_dump_tree(nodes, nr_nodes);
+
+    //wavl_test_dump_tree(nodes, sizeof(nodes)/sizeof(struct test_node));
 
     return true;
 }
@@ -1122,6 +1166,8 @@ int main(int argc __attribute__((unused)), const char *argv[])
     wavl_test_sign_invert_insert();
     wavl_test_delete_leaf_leaf_sibling();
     wavl_test_delete_leaf_unary_sibling();
+    //wavl_test_delete_inner_1();
+    //wavl_test_delete_every_third();
 
     ret = EXIT_SUCCESS;
     return ret;

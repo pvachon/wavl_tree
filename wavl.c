@@ -923,11 +923,11 @@ void wavl_test_dump_tree(struct test_node *start, size_t nr_nodes)
 }
 
 static
-wavl_result_t _test_node_compare_func(int lhs,
-                                      int rhs,
+wavl_result_t _test_node_compare_func(ptrdiff_t lhs,
+                                      ptrdiff_t rhs,
                                       int *pdir)
 {
-    *pdir = lhs - rhs;
+    *pdir = (int)(lhs - rhs);
     return WAVL_ERROR_OK;
 }
 
@@ -950,7 +950,7 @@ wavl_result_t _test_node_to_value_compare_func(void *key_lhs,
                                                struct wavl_tree_node *rhs,
                                                int *pdir)
 {
-    return _test_node_compare_func((int)key_lhs, TEST_NODE(rhs)->id, pdir);
+    return _test_node_compare_func((ptrdiff_t)key_lhs, TEST_NODE(rhs)->id, pdir);
 }
 
 /**

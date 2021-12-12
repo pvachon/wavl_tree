@@ -64,7 +64,7 @@ void __wavl_tree_node_double_demote(struct wavl_tree_node *n)
  * Get the given node's parity value
  */
 static inline
-bool __wavl_tree_get_node_parity(struct wavl_tree_node *n)
+bool __wavl_tree_node_get_parity(struct wavl_tree_node *n)
 {
     return NULL == n ? true : n->rp;
 }
@@ -81,9 +81,9 @@ bool __wavl_tree_node_is_2_child(struct wavl_tree_node *n, struct wavl_tree_node
 
     return p_is_unary && NULL == n
         ? true
-        : __wavl_tree_get_node_parity(n) == __wavl_tree_get_node_parity(p_n);
+        : __wavl_tree_node_get_parity(n) == __wavl_tree_node_get_parity(p_n);
 #endif
-    return __wavl_tree_get_node_parity(n) == __wavl_tree_get_node_parity(p_n);
+    return __wavl_tree_node_get_parity(n) == __wavl_tree_node_get_parity(p_n);
 }
 
 /**
@@ -345,9 +345,9 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
         }
 
         /* Get the parities of the next node */
-        par_x = __wavl_tree_get_node_parity(x),
-        par_p_x = __wavl_tree_get_node_parity(p_x),
-        par_s_x = __wavl_tree_get_node_parity(__wavl_tree_node_get_sibling(x));
+        par_x = __wavl_tree_node_get_parity(x),
+        par_p_x = __wavl_tree_node_get_parity(p_x),
+        par_s_x = __wavl_tree_node_get_parity(__wavl_tree_node_get_sibling(x));
 
         /* Continue iteration iff p(x) is 1,0 or 0,1 */
     } while  ((!par_x && !par_p_x &&  par_s_x) ||
@@ -368,7 +368,7 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
     if (x == p_x->left) {
         struct wavl_tree_node *y = x->right;
 
-        if (NULL == y || __wavl_tree_get_node_parity(y) == par_x) {
+        if (NULL == y || __wavl_tree_node_get_parity(y) == par_x) {
             /* If y is NULL or y is 2 distance (parities are equal), do a single rotation */
             _wavl_tree_rotate_right_at(tree, x);
             if (NULL != z) {
@@ -386,7 +386,7 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
     } else {
         struct wavl_tree_node *y = x->left;
 
-        if (NULL == y || __wavl_tree_get_node_parity(y) == par_x) {
+        if (NULL == y || __wavl_tree_node_get_parity(y) == par_x) {
             /* Perform a single rotation */
             _wavl_tree_rotate_left_at(tree, x);
             if (NULL != z) {
@@ -629,15 +629,16 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
 
         /* Check if the next step will create a 3-node of P(x) */
         creates_3_node = p_p_x != NULL &&
-            __wavl_tree_get_node_parity(p_x) == __wavl_tree_get_node_parity(p_p_x);
+            __wavl_tree_node_get_parity(p_x) == __wavl_tree_node_get_parity(p_p_x);
 
         /* Figure out which demote case we have */
         if (__wavl_tree_node_is_2_child(y, p_x)) {
             /* y is a 2-child, x is a 3 child, simply demote the parent */
             __wavl_tree_node_demote(p_x);
         } else {
-            if (y->rp == __wavl_tree_get_node_parity(y->left) &&
-                y->rp == __wavl_tree_get_node_parity(y->right))
+            bool y_rank_parity = __wavl_tree_node_get_parity(y);
+            if (y_rank_parity == __wavl_tree_node_get_parity(y->left) &&
+                y_rank_parity == __wavl_tree_node_get_parity(y->right))
             {
                 /* p_x is 3,1 Y (a 1-child) is 2, 2, so we can demote p_x and y */
                 __wavl_tree_node_demote(p_x);
@@ -662,7 +663,7 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
     struct wavl_tree_node *z = p_x;
     if (x == p_x->left) {
         struct wavl_tree_node *w = y->right;
-        if (__wavl_tree_get_node_parity(w) != __wavl_tree_get_node_parity(y)) {
+        if (__wavl_tree_node_get_parity(w) != __wavl_tree_node_get_parity(y)) {
             /* w is a 1-child of y */
             _wavl_tree_rotate_left_at(tree, y);
             __wavl_tree_node_promote(y);
@@ -673,7 +674,7 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
         } else {
             struct wavl_tree_node *v = y->left;
             /* w is a 2-child of y, thus v must be a 1-child */
-            WAVL_ASSERT(__wavl_tree_get_node_parity(y) != __wavl_tree_get_node_parity(v));
+            WAVL_ASSERT(__wavl_tree_node_get_parity(y) != __wavl_tree_node_get_parity(v));
 
             _wavl_tree_double_rotate_left_at(tree, v);
             __wavl_tree_node_double_promote(v);
@@ -682,7 +683,7 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
         }
     } else {
         struct wavl_tree_node *w = y->left;
-        if (__wavl_tree_get_node_parity(w) != __wavl_tree_get_node_parity(y)) {
+        if (__wavl_tree_node_get_parity(w) != __wavl_tree_node_get_parity(y)) {
             /* w is a 1-child of y */
             _wavl_tree_rotate_right_at(tree, y);
             __wavl_tree_node_promote(y);
@@ -692,7 +693,7 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
             }
         } else {
             struct wavl_tree_node *v = y->right;
-            WAVL_ASSERT(__wavl_tree_get_node_parity(y) != __wavl_tree_get_node_parity(v));
+            WAVL_ASSERT(__wavl_tree_node_get_parity(y) != __wavl_tree_node_get_parity(v));
 
             _wavl_tree_double_rotate_right_at(tree, v);
             __wavl_tree_node_double_promote(v);
@@ -716,7 +717,7 @@ void _wavl_tree_delete_rebalance_2_2_leaf(struct wavl_tree *tree,
     WAVL_ASSERT(NULL != leaf);
 
     /* Check if x is a 2-child of P(x) */
-    if (__wavl_tree_get_node_parity(x->parent) == __wavl_tree_get_node_parity(x)) {
+    if (__wavl_tree_node_get_parity(x->parent) == __wavl_tree_node_get_parity(x)) {
         /* The leaf was a 2-child, so we will need to kick off the 3,1/1,3 rebalancing */
         __wavl_tree_node_demote(x);
 
@@ -841,7 +842,7 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
         }
 
         /* Ensure the parent is not a leaf, and that the parity isn't true */
-        WAVL_ASSERT(!(__wavl_tree_node_is_leaf(p_y) && __wavl_tree_get_node_parity(p_y)));
+        WAVL_ASSERT(!(__wavl_tree_node_is_leaf(p_y) && __wavl_tree_node_get_parity(p_y)));
     }
 
     /* Clear the removed node's metadata out */

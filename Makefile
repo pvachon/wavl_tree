@@ -1,4 +1,4 @@
-OBJ=wavl.o
+OBJ=wavltree.o wavltree_test.o
 
 DEFINE=-D__WAVL_TEST__ -DDEBUG
 OFLAGS=-O0 -ggdb

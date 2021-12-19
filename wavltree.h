@@ -4,7 +4,7 @@ struct wavl_tree_node;
 struct wavl_tree;
 
 #define __WAVL_INCLUDING_WAVL_PRIV_H__
-#include "wavl_priv.h"
+#include "wavltree_priv.h"
 #undef __WAVL_INCLUDING_WAVL_PRIV_H__
 
 /**

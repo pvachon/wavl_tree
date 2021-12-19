@@ -44,29 +44,6 @@ typedef uint32_t wavl_result_t;
  */
 #define WAVL_UNLIKELY(_b)               __builtin_expect(!!(_b), 0)
 
-/**
- * Node rank difference is 1
- */
-#define WAVL_NODE_RANK_DIFF_1           0
-
-/**
- * Node rank dfference is 2
- */
-#define WAVL_NODE_RANK_DIFF_2           1
-
-
-/**
- * Container-of macro
- * \param pointer Node pointer
- * \param type The target type of the containing structure
- * \param member The name of the member of the containing structure
- *
- * \return Pointer to the structure that contains the node
- */
-#define WAVL_CONTAINER_OF(pointer, type, member) \
-    ({ __typeof__( ((type *)0)->member ) *__memb = (pointer); \
-       (type *)( (char *)__memb - offsetof(type, member) ); })
-
 #ifdef DEBUG
 #include <stdio.h>
 
@@ -128,7 +105,8 @@ typedef wavl_result_t (*wavl_key_to_node_compare_func_t)(void *key_lhs,
                                                          int *pdir);
 
 /**
- * A WAVL-tree node.
+ * A WAVL-tree node. Embed this in your own structure. All members of this structure
+ * are private.
  */
 struct wavl_tree_node {
     struct wavl_tree_node *left,    /**< Left-hand child; NULL if not present */
@@ -148,7 +126,9 @@ struct wavl_tree_node {
 #define WAVL_TREE_NODE_CLEAR(_n) do { (_n)->left = (_n)->right = (_n)->parent = NULL; (_n)->rp = false; } while (0)
 
 /**
- * A WAVL tree
+ * A WAVL tree. This structure contains all the state needed to maintain a wavl
+ * tree. All members of this structure are private, and should not be inspected or
+ * modified by users.
  */
 struct wavl_tree {
     struct wavl_tree_node *root;                /**< Root of the tree */

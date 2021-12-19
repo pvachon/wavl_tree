@@ -321,6 +321,44 @@ bool wavl_test_delete_every_third_then_reinsert(void)
     return true;
 }
 
+bool wavl_test_find(void)
+{
+    struct wavl_tree tree;
+    int node_id = 0, sign = -1;
+    const size_t nr_nodes = 32;
+    struct wavl_tree_node *found = NULL;
+    struct test_node *node = NULL;
+
+    printf("WAVL: Test search and removal.\n");
+
+    wavl_test_clear();
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_init(&tree, _test_node_to_node_compare_func, _test_node_to_value_compare_func));
+
+    for (size_t i = 0; i < nr_nodes; i++) {
+        nodes[i].id = sign * node_id;
+        WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)nodes[i].id, &nodes[i].node));
+        node_id += 1;
+        sign = -sign;
+    }
+
+    /* Try to find a node that definitely doesn't exist */
+    WAVL_TEST_ASSERT(WAVL_ERR_TREE_NOT_FOUND == wavl_tree_find(&tree, (void *)(ptrdiff_t)4, &found));
+
+    /* Try to find a node we know exists */
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_find(&tree, (void *)(ptrdiff_t)-4, &found));
+    node = TEST_NODE(found);
+    WAVL_TEST_ASSERT(node->id == -4);
+
+    /* Try to remove this node */
+    WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(&tree, found));
+
+    /* Now try finding it in the tree, once again */
+    WAVL_TEST_ASSERT(WAVL_ERR_TREE_NOT_FOUND == wavl_tree_find(&tree, (void *)(ptrdiff_t)-4, &found));
+
+    return true;
+}
+
 int main(int argc __attribute__((unused)), const char *argv[])
 {
     int ret = EXIT_FAILURE;
@@ -335,6 +373,8 @@ int main(int argc __attribute__((unused)), const char *argv[])
     wavl_test_delete_inner_1();
     wavl_test_delete_every_third();
     wavl_test_delete_every_third_then_reinsert();
+
+    wavl_test_find();
 
     ret = EXIT_SUCCESS;
     return ret;

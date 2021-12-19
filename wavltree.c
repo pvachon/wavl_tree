@@ -3,6 +3,17 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#ifdef __WAVL_TEST__
+#include <stdio.h>
+#define WAVL_DEBUG_OUT(_s, ...) \
+    do { fprintf(stdout,                            \
+        "DEBUG: " _s " (" __FILE__ ":%d @ %s)\n",   \
+        ##__VA_ARGS__, __LINE__, __FUNCTION__);     \
+    } while (0)
+#else
+#define WAVL_DEBUG_OUT(...)
+#endif
+
 wavl_result_t wavl_tree_init(struct wavl_tree *tree,
                              wavl_node_to_node_compare_func_t node_cmp,
                              wavl_key_to_node_compare_func_t key_cmp)
@@ -111,7 +122,7 @@ void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
                           *z = NULL,
                           *p_z = NULL;
 
-    fprintf(stdout, "-->Double rotate right\n");
+    WAVL_DEBUG_OUT("-->Double rotate right Tree %p node %p", tree, x);
 
     WAVL_ASSERT(NULL != tree);
     WAVL_ASSERT(NULL != x);
@@ -220,7 +231,7 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
     WAVL_ASSERT(NULL != tree);
     WAVL_ASSERT(NULL != x);
 
-    fprintf(stdout, "--> Double rotate left\n");
+    WAVL_DEBUG_OUT("--> Double rotate left (tree %p node %p)", tree, x);
 
     y = x->left;
     z = x->parent;
@@ -501,15 +512,11 @@ wavl_result_t wavl_tree_find(struct wavl_tree *tree,
             goto done;
         }
 
-        switch(dir) {
-        case -1:
+        if (dir < 0) {
             next = next->left;
-            break;
-        case 1:
+        } else if (dir > 0) {
             next = next->right;
-            break;
-        case 0:
-            /* Found the requested node */
+        } else {
             *pfound = next;
             goto done;
         }

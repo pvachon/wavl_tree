@@ -114,14 +114,6 @@ bool __wavl_tree_node_get_parity(struct wavl_tree_node *n)
 static inline
 bool __wavl_tree_node_is_2_child(struct wavl_tree_node *n, struct wavl_tree_node *p_n)
 {
-    /* If the node is unary and n is NULL, then we know n is a 2-node */
-#if 0
-    bool p_is_unary = (p_n->left == NULL || p_n->right == NULL) && p_n->left != p_n->right;
-
-    return p_is_unary && NULL == n
-        ? true
-        : __wavl_tree_node_get_parity(n) == __wavl_tree_node_get_parity(p_n);
-#endif
     return __wavl_tree_node_get_parity(n) == __wavl_tree_node_get_parity(p_n);
 }
 

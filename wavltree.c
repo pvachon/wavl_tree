@@ -142,7 +142,7 @@ void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
                           *z = NULL,
                           *p_z = NULL;
 
-    WAVL_DEBUG_OUT("-->Double rotate right Tree %p node %p", tree, x);
+    WAVL_DEBUG_OUT("--> Double rotate right Tree %p node %p", tree, x);
 
     WAVL_ASSERT(NULL != tree);
     WAVL_ASSERT(NULL != x);
@@ -269,7 +269,7 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
         tree->root = y;
     }
 
-    /* Move y's left subtree to z's right subtree (z < right(y)) */
+    /* Move y's left subtree to z's right subtree (z > right(y)) */
     z->right = y->left;
     if (NULL != y->left) {
         struct wavl_tree_node *left_y = y->left;
@@ -280,7 +280,7 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
     z->parent = y;
 
     /* Move y's right subtree to x's left */
-    x->right = y->right;
+    x->left = y->right;
     if (NULL != y->right) {
         struct wavl_tree_node *right_y = y->right;
         right_y->parent = x;

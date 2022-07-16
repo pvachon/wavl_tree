@@ -397,7 +397,7 @@ bool wavl_test_delete_every_third_then_reinsert(void)
         WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_insert(&tree, (void *)nodes[i].id, &nodes[i].node));
     }
 
-    wavl_test_dump_tree(nodes, nr_nodes);
+    // wavl_test_dump_tree(nodes, nr_nodes);
 
     return true;
 }
@@ -471,7 +471,7 @@ bool wavl_test_pseudorandom_1(void)
     printf("Inserting: ");
     for (size_t i = 0; i < 63; i++) {
         printf(" %02x ", (unsigned int)lfsr);
-
+        fflush(stdout);
         nodes[i].id = lfsr;
         WAVL_TEST_ASSERT(WAVL_ERR_OK ==
                 wavl_tree_insert(&tree,
@@ -488,16 +488,28 @@ bool wavl_test_pseudorandom_1(void)
         struct wavl_tree_node *nd = NULL;
         struct test_node *tn = NULL;
         printf(" %02x ", (unsigned int)lfsr);
+        fflush(stdout);
         WAVL_TEST_ASSERT(WAVL_ERR_OK ==
                 wavl_tree_find(&tree,
                     (void *)(ptrdiff_t)lfsr,
                     &nd));
+        WAVL_TEST_ASSERT(NULL != nd);
         tn = TEST_NODE(nd);
 
         WAVL_TEST_ASSERT(tn->id == lfsr);
 
+        WAVL_TEST_ASSERT(WAVL_ERR_OK == wavl_tree_remove(
+                    &tree,
+                    nd));
+
         lfsr = lfsr_next(lfsr, LFSR_POLY_6B_2);
     }
+
+    printf("\n");
+
+    wavl_test_dump_tree(nodes, 63);
+
+    WAVL_TEST_ASSERT(tree.root == NULL);
 
     return true;
 }

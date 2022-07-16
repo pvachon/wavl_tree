@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define WAVL_TEST_ASSERT(_x) \
     do {                                \
@@ -54,6 +55,58 @@ struct test_node {
  * Array of test nodes, used in test cases
  */
 struct test_node nodes[256];
+
+static
+size_t _binary_tree_log_2(size_t count)
+{
+    return 63U - __builtin_clzll(count);
+}
+
+static
+struct wavl_tree_node *_binary_tree_find_minimum(struct wavl_tree_node *root)
+{
+    assert(NULL != root);
+
+    struct wavl_tree_node *cur = root;
+
+    while (NULL != cur->left) {
+        cur = cur->left;
+    }
+
+    return cur;
+}
+
+static
+struct wavl_tree_node *_binary_tree_find_successor(struct wavl_tree_node *node)
+{
+    assert(NULL != node);
+
+    struct wavl_tree_node *cur = node;
+
+    /* If this node has a right-hand tree, then the successor is the minimum of that tree */
+    if (NULL == node->right) {
+        return _binary_tree_find_minimum(cur);
+    }
+
+
+}
+
+static
+bool binary_tree_assert(struct wavl_tree *tree, size_t nr_nodes)
+{
+    ptrdiff_t ids[nr_nodes];    /* The list of values, in-order, held by the tree */
+    struct wavl_tree_node *visit_stack[_binary_tree_log_2(nr_nodes) * 2];
+    size_t next_id = 0,
+           stack_top = 0;
+
+    struct wavl_tree_node *cur_node = tree->root;
+
+    while (true) {
+
+    }
+
+    return true;
+}
 
 static
 void wavl_test_dump_tree(struct test_node *start, size_t nr_nodes)
@@ -387,6 +440,68 @@ bool wavl_test_find(void)
     return true;
 }
 
+#define LFSR_POLY_6B_1 0x36
+#define LFSR_POLY_6B_2 0x30
+
+static
+uint32_t lfsr_next(uint32_t lfsr, uint32_t poly)
+{
+    bool fb = !!(lfsr & 1);
+
+    lfsr >>= 1;
+    lfsr = !fb ? lfsr : (lfsr ^ poly);
+
+    return lfsr;
+}
+
+static
+bool wavl_test_pseudorandom_1(void)
+{
+    uint32_t lfsr = LFSR_POLY_6B_1;
+    struct wavl_tree tree;
+
+    wavl_test_clear();
+
+    WAVL_TEST_ASSERT(WAVL_ERR_OK ==
+            wavl_tree_init(
+                &tree,
+                _test_node_to_node_compare_func,
+                _test_node_to_value_compare_func));
+
+    printf("Inserting: ");
+    for (size_t i = 0; i < 63; i++) {
+        printf(" %02x ", (unsigned int)lfsr);
+
+        nodes[i].id = lfsr;
+        WAVL_TEST_ASSERT(WAVL_ERR_OK ==
+                wavl_tree_insert(&tree,
+                    (void *)nodes[i].id,
+                    &nodes[i].node));
+
+        lfsr = lfsr_next(lfsr, LFSR_POLY_6B_1);
+    }
+
+    printf("\n");
+
+    printf("Removing: ");
+    for (size_t i = 0; i < 63; i++) {
+        struct wavl_tree_node *nd = NULL;
+        struct test_node *tn = NULL;
+        printf(" %02x ", (unsigned int)lfsr);
+        WAVL_TEST_ASSERT(WAVL_ERR_OK ==
+                wavl_tree_find(&tree,
+                    (void *)(ptrdiff_t)lfsr,
+                    &nd));
+        tn = TEST_NODE(nd);
+
+        WAVL_TEST_ASSERT(tn->id == lfsr);
+
+        lfsr = lfsr_next(lfsr, LFSR_POLY_6B_2);
+    }
+
+    return true;
+}
+
 int main(int argc __attribute__((unused)), const char *argv[])
 {
     int ret = EXIT_FAILURE;
@@ -403,6 +518,8 @@ int main(int argc __attribute__((unused)), const char *argv[])
     wavl_test_delete_every_third_then_reinsert();
 
     wavl_test_find();
+
+    wavl_test_pseudorandom_1();
 
     ret = EXIT_SUCCESS;
     return ret;

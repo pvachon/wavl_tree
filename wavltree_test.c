@@ -483,14 +483,19 @@ bool wavl_test_pseudorandom_1(void)
 
     printf("\n");
 
-    wavl_test_dump_tree(nodes, 63);
-
     printf("Removing: ");
     for (size_t i = 0; i < 63; i++) {
         struct wavl_tree_node *nd = NULL;
         struct test_node *tn = NULL;
-        printf(" %02x ", (unsigned int)lfsr);
+        printf(" %02x (%u) ", (unsigned int)lfsr, (unsigned int)lfsr);
         fflush(stdout);
+
+        if (0x15 == lfsr) {
+            printf("\n");
+            wavl_test_dump_tree(nodes, 63);
+            printf("\n");
+        }
+
         WAVL_TEST_ASSERT(WAVL_ERR_OK ==
                 wavl_tree_find(&tree,
                     (void *)(ptrdiff_t)lfsr,

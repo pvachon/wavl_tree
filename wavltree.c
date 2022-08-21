@@ -626,15 +626,15 @@ void _wavl_tree_swap_in_node_at(struct wavl_tree *tree,
  * Handle the specific case where a 2 child was removed, resulting in a 3-child.
  *
  * \param tree The tree we are updating
- * \param p_n The parent of the removed node.
  * \param n The node that replaced the removed node.
+ * \param p_n The parent of the removed node.
  *
  * Note that the rank difference between n and p_n is 3 at entry to this function.
  */
 static
 void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
-                                         struct wavl_tree_node *p_n,
-                                         struct wavl_tree_node *n)
+                                         struct wavl_tree_node *n,
+                                         struct wavl_tree_node *p_n)
 {
     struct wavl_tree_node *x = NULL,
                           *p_x = NULL,
@@ -644,6 +644,8 @@ void _wavl_tree_delete_rebalance_3_child(struct wavl_tree *tree,
 
     WAVL_ASSERT(NULL != tree);
     WAVL_ASSERT(NULL != p_n);
+
+    WAVL_DEBUG_OUT("---> 3 Child rebalance: Tree %p, node %p parent %p", tree, n, p_n);
 
     /* Start with rebalancing X */
     x = n;
@@ -865,7 +867,7 @@ wavl_result_t wavl_tree_remove(struct wavl_tree *tree,
     if (NULL != p_y) {
         if (true == is_2_child) {
             /* x is a 3-child of p_y, so we need to start handling that caase */
-            _wavl_tree_delete_rebalance_3_child(tree, p_y, x);
+            _wavl_tree_delete_rebalance_3_child(tree, x, p_y);
 
         } else if (NULL == x && p_y->left == p_y->right) {
             /* p_y is a 2,2 leaf, so we need to fix it up and figure out if this

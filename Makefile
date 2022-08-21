@@ -8,6 +8,8 @@ TARGET=wavl-test
 CFLAGS=$(OFLAGS) -Wextra -Wall $(DEFINE) -std=c11
 LDFLAGS=
 
+all: $(TARGET)
+
 .c.o:
 	$(CC) $(CFLAGS) -MMD -MP -c $<
 

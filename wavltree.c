@@ -127,7 +127,7 @@ bool __wavl_tree_node_is_leaf(struct wavl_tree_node *n)
 }
 
 /**
- * Perform a double-right rotation of the node x. We could do this using the other
+ * Perform a double-right rotation of the node y. We could do this using the other
  * rotate primitives, but for the sake of efficiency we will directly implement
  * the rotation.
  *
@@ -136,19 +136,21 @@ bool __wavl_tree_node_is_leaf(struct wavl_tree_node *n)
  */
 static
 void _wavl_tree_double_rotate_right_at(struct wavl_tree *tree,
-                                       struct wavl_tree_node *x)
+                                       struct wavl_tree_node *y)
 {
-    struct wavl_tree_node *y = NULL,
+    struct wavl_tree_node *x = NULL,
                           *z = NULL,
                           *p_z = NULL;
 
-    WAVL_DEBUG_OUT("--> Double rotate right Tree %p node %p", tree, x);
+    WAVL_DEBUG_OUT("--> Double rotate right Tree %p node %p", tree, y);
 
     WAVL_ASSERT(NULL != tree);
-    WAVL_ASSERT(NULL != x);
+    WAVL_ASSERT(NULL != y);
 
-    y = x->right;
+    x = y->parent;
+    WAVL_ASSERT(NULL != x);
     z = x->parent;
+    WAVL_ASSERT(NULL != z);
     p_z = z->parent;
 
     /* Rotate Y into place */
@@ -235,26 +237,28 @@ void _wavl_tree_rotate_right_at(struct wavl_tree *tree,
 }
 
 /**
- * Perform a dobule-left rotation of the node x.
+ * Perform a dobule-left rotation of the node y.
  *
  * Note that this function performs a double rotate restructuring, but
  * does not update the ranks. Updating the ranks is up to the caller.
  */
 static
 void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
-                                      struct wavl_tree_node *x)
+                                      struct wavl_tree_node *y)
 {
-    struct wavl_tree_node *y = NULL,
+    struct wavl_tree_node *x = NULL,
                           *z = NULL,
                           *p_z = NULL;
 
+    WAVL_DEBUG_OUT("--> Double rotate left (tree %p node %p)", tree, y);
+
     WAVL_ASSERT(NULL != tree);
+    WAVL_ASSERT(NULL != y);
+
+    x = y->parent;
     WAVL_ASSERT(NULL != x);
-
-    WAVL_DEBUG_OUT("--> Double rotate left (tree %p node %p)", tree, x);
-
-    y = x->left;
     z = x->parent;
+    WAVL_ASSERT(NULL != z);
     p_z = z->parent;
 
     /* Splice Y into its new position */
@@ -271,6 +275,7 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
 
     /* Move y's left subtree to z's right subtree (z > right(y)) */
     z->right = y->left;
+
     if (NULL != y->left) {
         struct wavl_tree_node *left_y = y->left;
         left_y->parent = z;
@@ -281,6 +286,7 @@ void _wavl_tree_double_rotate_left_at(struct wavl_tree *tree,
 
     /* Move y's right subtree to x's left */
     x->left = y->right;
+
     if (NULL != y->right) {
         struct wavl_tree_node *right_y = y->right;
         right_y->parent = x;
@@ -407,7 +413,7 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
             }
         } else {
             /* Perform a double right rotation to restore rank rule */
-            _wavl_tree_double_rotate_right_at(tree, x);
+            _wavl_tree_double_rotate_right_at(tree, y);
             __wavl_tree_node_promote(y);
             __wavl_tree_node_demote(x);
             if (NULL != z) {
@@ -425,7 +431,7 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
             }
         } else {
             /* Perform a double-left rotation to restore the rank rule */
-            _wavl_tree_double_rotate_left_at(tree, x);
+            _wavl_tree_double_rotate_left_at(tree, y);
             __wavl_tree_node_promote(y);
             __wavl_tree_node_demote(x);
             if (NULL != z) {

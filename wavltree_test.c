@@ -483,6 +483,8 @@ bool wavl_test_pseudorandom_1(void)
 
     printf("\n");
 
+    wavl_test_dump_tree(nodes, 63);
+
     printf("Removing: ");
     for (size_t i = 0; i < 63; i++) {
         struct wavl_tree_node *nd = NULL;

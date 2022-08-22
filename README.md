@@ -15,7 +15,7 @@ tree is equivalent to that of an AVL tree, with a slightly less complex
 set of rebalancing operations.
 
 Not all wavl trees are AVL trees (but those that are insertion-only are),
-but interestingly, all AVL trees are valid red-black trees. Red-Black trees,
+but interestingly, all wavl trees are valid red-black trees. Red-Black trees,
 however, are a superset of wavl trees. Thus, not all red-black trees are
 valid wavl trees. How's that for an interesting result?
 

@@ -93,14 +93,16 @@ typedef uint32_t wavl_result_t;
 /**
  * Ordering function to compare a node to another node.
  */
-typedef wavl_result_t (*wavl_node_to_node_compare_func_t)(struct wavl_tree_node *lhs,
+typedef wavl_result_t (*wavl_node_to_node_compare_func_t)(struct wavl_tree *tree,
+                                                          struct wavl_tree_node *lhs,
                                                           struct wavl_tree_node *rhs,
                                                           int *pdir);
 
 /**
  * Ordering function to compare a node to a key.
  */
-typedef wavl_result_t (*wavl_key_to_node_compare_func_t)(void *key_lhs,
+typedef wavl_result_t (*wavl_key_to_node_compare_func_t)(struct wavl_tree *tree,
+                                                         void *key_lhs,
                                                          struct wavl_tree_node *rhs,
                                                          int *pdir);
 

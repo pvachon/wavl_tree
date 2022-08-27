@@ -88,7 +88,7 @@ struct wavl_tree_node *_binary_tree_find_successor(struct wavl_tree_node *node)
         return _binary_tree_find_minimum(cur);
     }
 
-
+    return cur;
 }
 
 static
@@ -164,7 +164,8 @@ wavl_result_t _test_node_compare_func(ptrdiff_t lhs,
  * Comparison function (for testing), to compare node-to-node
  */
 static
-wavl_result_t _test_node_to_node_compare_func(struct wavl_tree_node *lhs,
+wavl_result_t _test_node_to_node_compare_func(struct wavl_tree *tree,
+                                              struct wavl_tree_node *lhs,
                                               struct wavl_tree_node *rhs,
                                               int *pdir)
 {
@@ -175,7 +176,8 @@ wavl_result_t _test_node_to_node_compare_func(struct wavl_tree_node *lhs,
  * Comparison function (for testing), to compare key-to-node
  */
 static
-wavl_result_t _test_node_to_value_compare_func(void *key_lhs,
+wavl_result_t _test_node_to_value_compare_func(struct wavl_tree *tree,
+                                               void *key_lhs,
                                                struct wavl_tree_node *rhs,
                                                int *pdir)
 {

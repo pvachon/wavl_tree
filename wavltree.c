@@ -474,7 +474,7 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
     while (NULL != parent) {
         int dir = -1;
 
-        if (WAVL_FAILED(ret = tree->key_cmp(key, parent, &dir))) {
+        if (WAVL_FAILED(ret = tree->key_cmp(tree, key, parent, &dir))) {
             goto done;
         }
 
@@ -534,7 +534,7 @@ wavl_result_t wavl_tree_find(struct wavl_tree *tree,
     while (NULL != next) {
         int dir = -1;
 
-        if (WAVL_FAILED(ret = tree->key_cmp(key, next, &dir))) {
+        if (WAVL_FAILED(ret = tree->key_cmp(tree, key, next, &dir))) {
             goto done;
         }
 

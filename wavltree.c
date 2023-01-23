@@ -456,7 +456,7 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
     WAVL_ASSERT_ARG(NULL != tree);
     WAVL_ASSERT_ARG(NULL != node);
 
-    node->left = node-> right = NULL;
+    node->left = node->right = NULL;
 
     /* Set initial rank parity (freshly inserted nodes are 0-children) */
     node->rp = false;
@@ -584,7 +584,7 @@ void _wavl_tree_swap_in_node_at(struct wavl_tree *tree,
 {
     struct wavl_tree_node *left = old->left,
                           *right = old->right,
-                          *parent = old->parent;;
+                          *parent = old->parent;
 
     new->parent = parent;
     if (NULL != parent) {

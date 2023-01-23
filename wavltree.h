@@ -39,7 +39,7 @@ wavl_result_t wavl_tree_init(struct wavl_tree *tree,
  * \param tree Pointer to the tree state structure.
  * \param key The key for the item to be inserted. This is assumed to be an attribute
  *            of the structure containing the `struct wavl_tree_node`, and thus storing
- *            the kehy is the responsibility of the user.
+ *            the key is the responsibility of the user.
  * \param node The `struct wavl_tree_node` that represents an element to be inserted.
  *
  * \return WAVL_ERR_OK on success. If a duplicate node is found, returns WAVL_ERR_TREE_DUPE.

@@ -4,14 +4,8 @@
  * Implementation details for the WAVL Tree Library.
  */
 
-#include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-
-/**
- * A normal WAVL tree result
- */
-typedef uint32_t wavl_result_t;
 
 #define WAVL_ERROR_FLAG                 (1ull << 31)
 #define WAVL_ERROR_OK                   0
@@ -89,22 +83,6 @@ typedef uint32_t wavl_result_t;
 
 
 #endif /* defined(DEBUG) */
-
-/**
- * Ordering function to compare a node to another node.
- */
-typedef wavl_result_t (*wavl_node_to_node_compare_func_t)(struct wavl_tree *tree,
-                                                          struct wavl_tree_node *lhs,
-                                                          struct wavl_tree_node *rhs,
-                                                          int *pdir);
-
-/**
- * Ordering function to compare a node to a key.
- */
-typedef wavl_result_t (*wavl_key_to_node_compare_func_t)(struct wavl_tree *tree,
-                                                         void *key_lhs,
-                                                         struct wavl_tree_node *rhs,
-                                                         int *pdir);
 
 /**
  * A WAVL-tree node. Embed this in your own structure. All members of this structure

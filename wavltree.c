@@ -402,23 +402,20 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
      * rank rule.
      */
     struct wavl_tree_node *z = x->parent;
+    WAVL_ASSERT(NULL != z);
     if (x == p_x->left) {
         struct wavl_tree_node *y = x->right;
 
         if (NULL == y || __wavl_tree_node_get_parity(y) == par_x) {
             /* If y is NULL or y is 2 distance (parities are equal), do a single rotation */
             _wavl_tree_rotate_right_at(tree, x);
-            if (NULL != z) {
-                __wavl_tree_node_demote(z);
-            }
+            __wavl_tree_node_demote(z);
         } else {
             /* Perform a double right rotation to restore rank rule */
             _wavl_tree_double_rotate_right_at(tree, y);
             __wavl_tree_node_promote(y);
             __wavl_tree_node_demote(x);
-            if (NULL != z) {
-                __wavl_tree_node_demote(z);
-            }
+            __wavl_tree_node_demote(z);
         }
     } else {
         struct wavl_tree_node *y = x->left;
@@ -426,17 +423,13 @@ void _wavl_tree_insert_rebalance(struct wavl_tree *tree,
         if (NULL == y || __wavl_tree_node_get_parity(y) == par_x) {
             /* Perform a single rotation */
             _wavl_tree_rotate_left_at(tree, x);
-            if (NULL != z) {
-                __wavl_tree_node_demote(z);
-            }
+            __wavl_tree_node_demote(z);
         } else {
             /* Perform a double-left rotation to restore the rank rule */
             _wavl_tree_double_rotate_left_at(tree, y);
             __wavl_tree_node_promote(y);
             __wavl_tree_node_demote(x);
-            if (NULL != z) {
-                __wavl_tree_node_demote(z);
-            }
+            __wavl_tree_node_demote(z);
         }
     }
 
@@ -456,7 +449,7 @@ wavl_result_t wavl_tree_insert(struct wavl_tree *tree,
     WAVL_ASSERT_ARG(NULL != tree);
     WAVL_ASSERT_ARG(NULL != node);
 
-    node->left = node-> right = NULL;
+    node->left = node->right = NULL;
 
     /* Set initial rank parity (freshly inserted nodes are 0-children) */
     node->rp = false;
@@ -584,7 +577,7 @@ void _wavl_tree_swap_in_node_at(struct wavl_tree *tree,
 {
     struct wavl_tree_node *left = old->left,
                           *right = old->right,
-                          *parent = old->parent;;
+                          *parent = old->parent;
 
     new->parent = parent;
     if (NULL != parent) {

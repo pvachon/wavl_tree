@@ -1,7 +1,40 @@
 #pragma once
 
+#include <stdint.h>
+
+/**
+ * A WAVL-tree node. Embed this in your own structure. All members of this structure
+ * are private.
+ */
 struct wavl_tree_node;
+
+/**
+ * A WAVL tree. This structure contains all the state needed to maintain a wavl
+ * tree. All members of this structure are private, and should not be inspected or
+ * modified by users.
+ */
 struct wavl_tree;
+
+/**
+ * A normal WAVL tree result
+ */
+typedef uint32_t wavl_result_t;
+
+/**
+ * Ordering function to compare a node to another node.
+ */
+typedef wavl_result_t (*wavl_node_to_node_compare_func_t)(struct wavl_tree *tree,
+                                                          struct wavl_tree_node *lhs,
+                                                          struct wavl_tree_node *rhs,
+                                                          int *pdir);
+
+/**
+ * Ordering function to compare a node to a key.
+ */
+typedef wavl_result_t (*wavl_key_to_node_compare_func_t)(struct wavl_tree *tree,
+                                                         void *key_lhs,
+                                                         struct wavl_tree_node *rhs,
+                                                         int *pdir);
 
 #define __WAVL_INCLUDING_WAVL_PRIV_H__
 #include "wavltree_priv.h"
@@ -39,7 +72,7 @@ wavl_result_t wavl_tree_init(struct wavl_tree *tree,
  * \param tree Pointer to the tree state structure.
  * \param key The key for the item to be inserted. This is assumed to be an attribute
  *            of the structure containing the `struct wavl_tree_node`, and thus storing
- *            the kehy is the responsibility of the user.
+ *            the key is the responsibility of the user.
  * \param node The `struct wavl_tree_node` that represents an element to be inserted.
  *
  * \return WAVL_ERR_OK on success. If a duplicate node is found, returns WAVL_ERR_TREE_DUPE.

@@ -24,5 +24,8 @@ clean:
 	$(RM) $(OBJ) $(TARGET)
 	$(RM) $(inc)
 
-.PHONY: all clean
+check: $(TARGET)
+	./$(TARGET)
+
+.PHONY: all clean check
 
